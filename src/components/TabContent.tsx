@@ -1,14 +1,12 @@
 // components/TabContent.tsx
 import React from 'react';
 import { Patient, PractitionerRole } from 'fhir/r4';
-import { Card } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Pencil, Plus } from 'lucide-react';
-import PrimaryInformation from './PrimaryInformation';
-import ContactInformation from './ContactInformation';
-import EmergencyContacts from './EmergencyContacts';
-import GeneralPractitioners from './GeneralPractitioners';
+import PrimaryInformation from './summary/PrimaryInformation';
+import ContactInformation from './summary/ContactInformation';
+import EmergencyContacts from './summary/EmergencyContacts';
+import GeneralPractitioners from './summary/GeneralPractitioners';
+import Allergies from './allergy';
+import Vitals from './vitals';
 interface TabContentProps {
   activeTab: string;
   patient: Patient;
@@ -35,13 +33,10 @@ const TabContent: React.FC<TabContentProps> = ({ activeTab, patient }) => {
             </div>
           </div>
         );
+    case 'vitals':
+        return <Vitals />;
     case 'allergies':
-      return (
-        <div className="p-6">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Allergies</h3>
-          <p>Allergy information will be displayed here.</p>
-        </div>
-      );
+      return <Allergies />;
 
     case 'immunization':
       return (
