@@ -35,7 +35,7 @@ export const useSmartLaunch = () => {
   const initiateAuth = (authUrl: string, iss: string, launch: string) => {
     const clientId = '91360c07-2b70-422b-bf6e-62cbd402f145';
     const redirectUri = `${window.location.origin}/callback`;
-    const scope = 'openid fhirUser launch offline_access user/Condition.read user/Condition.write user/DiagnosticReport.read user/DiagnosticReport.write user/DocumentReference.read user/DocumentReference.write user/Encounter.read user/Encounter.write user/Observation.read user/Observation.write user/Patient.read user/Patient.write user/Person.read patient/Condition.read patient/Condition.write patient/DiagnosticReport.read patient/DiagnosticReport.write patient/Encounter.read patient/Encounter.write patient/Immunization.read patient/Immunization.write patient/Observation.read patient/Observation.write patient/Patient.read patient/Patient.write patient/Person.read patient/Procedure.read patient/Procedure.write';
+    const scope = 'openid fhirUser launch offline_access user/DocumentReference.read user/DocumentReference.write user/Encounter.read user/Encounter.write user/Observation.read user/Observation.write user/Patient.read user/Patient.write user/Person.read patient/Condition.read patient/Condition.write patient/Encounter.read patient/Encounter.write patient/Immunization.read patient/Immunization.write patient/Observation.read patient/Observation.write patient/Patient.read patient/Patient.write patient/Procedure.read patient/Procedure.write';
     const state = generateRandomState();
 
     // Store the state in sessionStorage

@@ -1,38 +1,35 @@
 import React, { useState, useMemo } from 'react';
 import { usePatientVitals } from '@/hooks/usePatientVitals';
 import { Observation } from 'fhir/r4';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, 
          ComposedChart, Legend } from 'recharts';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import AddVitalsSheet from './AddVitalsSheet';  // Import the new component
+import AddVitalsSheet from './AddVitalsSheet';
+import axios from 'axios';
+import { createHeartRateObservation, createBloodPressureObservation, createBodyTemperatureObservation, createRespiratoryRateObservation, createOxygenSaturationObservation, createBodyWeight, createBMI } from '@/lib/Vital.Helpers';
 
 const Vitals: React.FC = () => {
-  const { vitals, loading } = usePatientVitals();
-  const [newVital, setNewVital] = useState({ code: '', value: '', unit: '' });
+  const { vitals, loading, refetch } = usePatientVitals();
   const [selectedVital, setSelectedVital] = useState('all');
 
   const filteredVitals = useMemo(() => {
     if (selectedVital === 'all') return vitals;
-    return vitals.filter(vital => vital.code?.text === selectedVital);
+    return vitals.filter(vital => vital?.code?.text === selectedVital);
   }, [vitals, selectedVital]);
 
   const uniqueVitalTypes = useMemo(() => 
-    ['all', ...new Set(vitals.map(vital => vital.code?.text))],
+    ['all', ...new Set(vitals?.map(vital => vital?.code?.text))],
     [vitals]
   );
 
   const chartData = useMemo(() => {
-    return filteredVitals.map(vital => ({
-      date: new Date(vital.effectiveDateTime).toLocaleDateString(),
-      value: vital.valueQuantity?.value,
-      code: vital.code?.text,
+    return filteredVitals?.map(vital => ({
+      date: new Date(vital?.effectiveDateTime).toLocaleDateString(),
+      value: vital?.valueQuantity?.value,
+      code: vital?.code?.text,
       ...(vital.code?.text === 'Blood Pressure' && {
         systolic: vital.component?.find(c => c.code.text === 'Systolic')?.valueQuantity?.value,
         diastolic: vital.component?.find(c => c.code.text === 'Diastolic')?.valueQuantity?.value,
@@ -40,13 +37,58 @@ const Vitals: React.FC = () => {
     }));
   }, [filteredVitals]);
 
-  const handleAddVital = (values) => {
-    console.log({
-        values
-    })
-     // make api call
-    console.log('Adding new vital:', newVital);
-    setNewVital({ code: '', value: '', unit: '' });
+  const createObservation = async (value: { code: string, value: string, unit: string }) => {
+    const accessToken = localStorage.getItem("access_token");
+    const patientId = localStorage.getItem("patient");
+    const issuer = localStorage.getItem("issuer");
+  
+    let observation: Observation;
+  
+    switch (value.code) {
+      case 'blood-pressure':
+        const [systolic, diastolic] = value.value.split('/').map(Number);
+        observation = createBloodPressureObservation(patientId, systolic, diastolic);
+        break;
+      case 'heart-rate':
+        observation = createHeartRateObservation(patientId, Number(value.value));
+        break;
+      case 'temperature':
+        observation = createBodyTemperatureObservation(patientId, Number(value.value));
+        break;
+      case 'respiratory-rate':
+        observation = createRespiratoryRateObservation(patientId, Number(value.value));
+        break;
+      case 'oxygen-saturation':
+        observation = createOxygenSaturationObservation(patientId, Number(value.value));
+        break;
+      case 'body-weight':
+        observation = createBodyWeight(patientId, Number(value.value));
+        break;
+      case 'bmi':
+        observation = createBMI(patientId, Number(value.value));
+        break;
+      default:
+        throw new Error(`Unsupported vital type: ${value.code}`);
+    }
+  
+    const response = await axios.post<Observation>(`${issuer}/Observation`, observation, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Accept': 'application/json',
+      },
+    });
+  
+    return response.data;
+  };
+
+  const handleAddVital = async (values) => {
+    try {
+      await Promise.all(values.map(createObservation));
+      await refetch(); // Refresh the vitals data after adding new vitals
+    } catch (error) {
+      console.error("Error adding vital signs:", error);
+      throw error; // Rethrow the error to be caught by AddVitalsSheet
+    }
   };
 
   if (loading) {
@@ -54,9 +96,17 @@ const Vitals: React.FC = () => {
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="flex items-center justify-center h-64"
+        className="flex flex-col items-center justify-center h-64"
       >
-        <div className="text-2xl font-semibold text-gray-600">Loading vitals...</div>
+        <div className="flex justify-between items-center w-full px-4">
+          <h2 className="text-3xl font-bold">Patient Vitals</h2>
+          <div className="ml-auto">
+            <AddVitalsSheet onAddVitals={handleAddVital} />
+          </div>
+        </div>
+        <div className="text-2xl font-semibold text-gray-600 mt-4">
+          Loading vitals...
+        </div>
       </motion.div>
     );
   }
@@ -66,9 +116,17 @@ const Vitals: React.FC = () => {
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="flex items-center justify-center h-64"
+        className="flex flex-col items-center justify-center h-64"
       >
-        <div className="text-2xl font-semibold text-gray-600">No vitals data available.</div>
+        <div className="flex justify-between items-center w-full px-4">
+          <h2 className="text-3xl font-bold">Patient Vitals</h2>
+          <div className="ml-auto">
+            <AddVitalsSheet onAddVitals={handleAddVital} />
+          </div>
+        </div>
+        <div className="text-2xl font-semibold text-gray-600 mt-4">
+          No vitals data available.
+        </div>
       </motion.div>
     );
   }

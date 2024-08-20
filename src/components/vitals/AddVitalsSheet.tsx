@@ -6,7 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { PlusCircle, Info } from "lucide-react";
+import { PlusCircle, Info, Loader2 } from "lucide-react";
+import { vitalOptions } from './vitalOptions';
 
 interface Vital {
   code: string;
@@ -16,28 +17,36 @@ interface Vital {
 }
 
 interface AddVitalsSheetProps {
-  onAddVitals: (vitals: Vital[]) => void;
+  onAddVitals: (vitals: Vital[]) => Promise<void>;
 }
-
-const vitalOptions = [
-  { code: 'blood-pressure', name: 'Blood Pressure', unit: 'mmHg', normalRange: { min: 90, max: 120 }, insights: ['Indicates the force of blood against artery walls', 'Important for cardiovascular health'] },
-  { code: 'heart-rate', name: 'Heart Rate', unit: 'bpm', normalRange: { min: 60, max: 100 }, insights: ['Measures how many times your heart beats per minute', 'Can indicate fitness level and stress'] },
-  { code: 'temperature', name: 'Temperature', unit: '°C', normalRange: { min: 36.1, max: 37.2 }, insights: ['Core body temperature', 'Can indicate infection or illness'] },
-  { code: 'respiratory-rate', name: 'Respiratory Rate', unit: 'breaths/min', normalRange: { min: 12, max: 20 }, insights: ['Number of breaths taken per minute', 'Can indicate respiratory or cardiac issues'] },
-  { code: 'oxygen-saturation', name: 'Oxygen Saturation', unit: '%', normalRange: { min: 95, max: 100 }, insights: ['Percentage of oxygen in the blood', 'Important for overall health and organ function'] },
-];
 
 const AddVitalsSheet: React.FC<AddVitalsSheetProps> = ({ onAddVitals }) => {
   const [vitals, setVitals] = useState<Vital[]>([{ code: '', name: '', value: '', unit: '' }]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [feedback, setFeedback] = useState<string[]>([]);
+  const [isOpen, setIsOpen] = useState(false);
 
-  const handleAddVital = (e: React.FormEvent | undefined) => {
+  const handleAddVital = async (e: React.FormEvent | undefined) => {
     if (e && e.preventDefault) {
       e.preventDefault();
     }
-    onAddVitals(vitals.filter(v => v.code && v.value));
-    setVitals([{ code: '', name: '', value: '', unit: '' }]);
+    setIsSubmitting(true);
+    setFeedback([]);
+    try {
+      const validVitals = vitals.filter(v => v.code && v.value);
+      await onAddVitals(validVitals);
+      setFeedback(validVitals.map(v => `Created ${v.name} vital`));
+      setVitals([{ code: '', name: '', value: '', unit: '' }]);
+    } catch (error) {
+      console.log({
+        message: 'Error creating vitals',
+        error,
+      })
+      setFeedback(['Error creating vitals. Please try again.']);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
-  
 
   const handleVitalChange = (index: number, field: keyof Vital, value: string) => {
     const newVitals = [...vitals];
@@ -47,6 +56,9 @@ const AddVitalsSheet: React.FC<AddVitalsSheetProps> = ({ onAddVitals }) => {
       if (selectedVital) {
         newVitals[index].name = selectedVital.name;
         newVitals[index].unit = selectedVital.unit;
+        if (value === 'blood-pressure') {
+          newVitals[index].value = '/'; // Initialize with a slash for systolic/diastolic
+        }
       }
     }
     setVitals(newVitals);
@@ -59,8 +71,16 @@ const AddVitalsSheet: React.FC<AddVitalsSheetProps> = ({ onAddVitals }) => {
   const isVitalValueNormal = (vital: Vital) => {
     const selectedVital = vitalOptions.find(v => v.code === vital.code);
     if (selectedVital && selectedVital.normalRange) {
-      const value = parseFloat(vital.value);
-      return value >= selectedVital.normalRange.min && value <= selectedVital.normalRange.max;
+      if (vital.code === 'blood-pressure') {
+        const [systolic, diastolic] = vital.value.split('/').map(Number);
+        return systolic >= selectedVital.normalRange.systolic.min && 
+               systolic <= selectedVital.normalRange.systolic.max &&
+               diastolic >= selectedVital.normalRange.diastolic.min && 
+               diastolic <= selectedVital.normalRange.diastolic.max;
+      } else {
+        const value = parseFloat(vital.value);
+        return value >= selectedVital.normalRange.min && value <= selectedVital.normalRange.max;
+      }
     }
     return null;
   };
@@ -74,21 +94,34 @@ const AddVitalsSheet: React.FC<AddVitalsSheetProps> = ({ onAddVitals }) => {
     const selectedVital = vitalOptions.find(v => v.code === vital.code);
     if (!selectedVital) return '';
 
-    if (parseFloat(vital.value) < selectedVital.normalRange.min) {
-      return `Value is below the normal range of ${selectedVital.normalRange.min} - ${selectedVital.normalRange.max} ${selectedVital.unit}`;
+    if (vital.code === 'blood-pressure') {
+      const [systolic, diastolic] = vital.value.split('/').map(Number);
+      const systolicRange = `${selectedVital.normalRange.systolic.min} - ${selectedVital.normalRange.systolic.max}`;
+      const diastolicRange = `${selectedVital.normalRange.diastolic.min} - ${selectedVital.normalRange.diastolic.max}`;
+      
+      if (systolic < selectedVital.normalRange.systolic.min || diastolic < selectedVital.normalRange.diastolic.min) {
+        return `Value is below the normal range of ${systolicRange}/${diastolicRange} ${selectedVital.unit}`;
+      }
+      if (systolic > selectedVital.normalRange.systolic.max || diastolic > selectedVital.normalRange.diastolic.max) {
+        return `Value is above the normal range of ${systolicRange}/${diastolicRange} ${selectedVital.unit}`;
+      }
+      return `Value is within the normal range of ${systolicRange}/${diastolicRange} ${selectedVital.unit}`;
+    } else {
+      const value = parseFloat(vital.value);
+      if (value < selectedVital.normalRange.min) {
+        return `Value is below the normal range of ${selectedVital.normalRange.min} - ${selectedVital.normalRange.max} ${selectedVital.unit}`;
+      }
+      if (value > selectedVital.normalRange.max) {
+        return `Value is above the normal range of ${selectedVital.normalRange.min} - ${selectedVital.normalRange.max} ${selectedVital.unit}`;
+      }
+      return `Value is within the normal range of ${selectedVital.normalRange.min} - ${selectedVital.normalRange.max} ${selectedVital.unit}`;
     }
-
-    if (parseFloat(vital.value) > selectedVital.normalRange.max) {
-      return `Value is above the normal range of ${selectedVital.normalRange.min} - ${selectedVital.normalRange.max} ${selectedVital.unit}`;
-    }
-
-    return `Value is within the normal range of ${selectedVital.normalRange.min} - ${selectedVital.normalRange.max} ${selectedVital.unit}`;
   };
 
   return (
-    <Sheet>
+    <Sheet open={isOpen} onOpenChange={setIsOpen}>
       <SheetTrigger asChild>
-        <Button>Add Vitals</Button>
+        <Button onClick={() => setIsOpen(true)}>Add Vitals</Button>
       </SheetTrigger>
       <SheetContent className="w-[500px] sm:w-[600px] flex flex-col">
         <SheetHeader>
@@ -118,13 +151,33 @@ const AddVitalsSheet: React.FC<AddVitalsSheetProps> = ({ onAddVitals }) => {
                   <div className="flex space-x-4">
                     <div className="flex-grow">
                       <Label htmlFor={`value-${index}`}>Value</Label>
-                      <Input
-                        id={`value-${index}`}
-                        type="number"
-                        placeholder="e.g., 120"
-                        value={vital.value}
-                        onChange={(e) => handleVitalChange(index, 'value', e.target.value)}
-                      />
+                      {vital.code === 'blood-pressure' ? (
+                        <div className="flex items-center space-x-2">
+                          <Input
+                            id={`systolic-${index}`}
+                            type="number"
+                            placeholder="Systolic"
+                            value={vital.value.split('/')[0]}
+                            onChange={(e) => handleVitalChange(index, 'value', `${e.target.value}/${vital.value.split('/')[1]}`)}
+                          />
+                          <span>/</span>
+                          <Input
+                            id={`diastolic-${index}`}
+                            type="number"
+                            placeholder="Diastolic"
+                            value={vital.value.split('/')[1]}
+                            onChange={(e) => handleVitalChange(index, 'value', `${vital.value.split('/')[0]}/${e.target.value}`)}
+                          />
+                        </div>
+                      ) : (
+                        <Input
+                          id={`value-${index}`}
+                          type="number"
+                          placeholder="e.g., 120"
+                          value={vital.value}
+                          onChange={(e) => handleVitalChange(index, 'value', e.target.value)}
+                        />
+                      )}
                     </div>
                     <div className="w-1/3">
                       <Label htmlFor={`unit-${index}`}>Unit</Label>
@@ -155,13 +208,33 @@ const AddVitalsSheet: React.FC<AddVitalsSheetProps> = ({ onAddVitals }) => {
             </div>
           </ScrollArea>
           <SheetFooter className="flex flex-col gap-2 mt-4">
-            <Button type="button" onClick={addNewVitalField} className="w-full">
+            <Button type="button" onClick={addNewVitalField} className="w-full" disabled={isSubmitting}>
               <PlusCircle className="mr-2" />
               Add Another Vital
             </Button>
-            <Button type="submit" className="w-full">Add Vitals</Button>
+            <Button type="submit" className="w-full" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Adding Vitals...
+                </>
+              ) : (
+                'Add Vitals'
+              )}
+            </Button>
           </SheetFooter>
         </form>
+        {feedback.length > 0 && (
+          <Alert className="mt-4">
+            <AlertDescription>
+              <ul className="list-disc pl-5">
+                {feedback.map((message, index) => (
+                  <li key={index}>{message}</li>
+                ))}
+              </ul>
+            </AlertDescription>
+          </Alert>
+        )}
       </SheetContent>
     </Sheet>
   );
