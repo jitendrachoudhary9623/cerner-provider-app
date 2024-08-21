@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger, SheetFooter } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { PlusCircle, Info, Loader2 } from "lucide-react";
+import { PlusCircle, Info, Loader2, X } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { vitalOptions } from './vitalOptions';
 
 interface Vital {
+  id: string;
   code: string;
   name: string;
   value: string;
@@ -26,23 +27,27 @@ interface AddVitalsSheetProps {
 }
 
 const AddVitalsSheet: React.FC<AddVitalsSheetProps> = ({ onAddVitals }) => {
-  const [vitals, setVitals] = useState<Vital[]>([{ code: '', name: '', value: '', unit: '', effectiveDateTime: new Date() }]);
+  const [isOpen, setIsOpen] = useState(false);
+  const [vitals, setVitals] = useState<Vital[]>([{ id: Date.now().toString(), code: '', name: '', value: '', unit: '', effectiveDateTime: new Date() }]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<string[]>([]);
-  const [isOpen, setIsOpen] = useState(false);
+
+  const isVitalValid = (vital: Vital) => vital.code && vital.value && vital.effectiveDateTime;
+  const areAllVitalsValid = vitals.every(isVitalValid);
+  const canSubmit = vitals.length > 0 && areAllVitalsValid;
 
   const handleAddVital = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setFeedback([]);
     try {
-      const validVitals = vitals.filter(v => v.code && v.value);
+      const validVitals = vitals.filter(isVitalValid);
       if (validVitals.length === 0) {
         throw new Error('No valid vitals to add');
       }
       await onAddVitals(validVitals);
       setFeedback(validVitals.map(v => `Created ${v.name} vital`));
-      setVitals([{ code: '', name: '', value: '', unit: '', effectiveDateTime: new Date() }]);
+      setVitals([{ id: Date.now().toString(), code: '', name: '', value: '', unit: '', effectiveDateTime: new Date() }]);
       setIsOpen(false);
     } catch (error) {
       console.error('Error creating vitals', error);
@@ -52,30 +57,34 @@ const AddVitalsSheet: React.FC<AddVitalsSheetProps> = ({ onAddVitals }) => {
     }
   };
 
-  const handleVitalChange = (index: number, field: keyof Vital, value: string | Date) => {
-    const newVitals = [...vitals];
-    if (field === 'effectiveDateTime' && value instanceof Date) {
-      newVitals[index][field] = value;
-    } else if (typeof value === 'string') {
-      newVitals[index][field as keyof Omit<Vital, 'effectiveDateTime'>] = value;
-    }
-    if (field === 'code') {
-      const selectedVital = vitalOptions.find(v => v.code === value);
-      if (selectedVital) {
-        newVitals[index].name = selectedVital.name;
-        newVitals[index].unit = selectedVital.unit;
-        if (selectedVital.inputType === 'dual') {
-          newVitals[index].value = '/';
-        } else {
-          newVitals[index].value = '';
+  const handleVitalChange = (id: string, field: keyof Vital, value: string | Date) => {
+    setVitals(prevVitals => prevVitals.map(vital => {
+      if (vital.id === id) {
+        if (field === 'effectiveDateTime' && value instanceof Date) {
+          return { ...vital, [field]: value };
+        } else if (typeof value === 'string') {
+          const updatedVital = { ...vital, [field]: value };
+          if (field === 'code') {
+            const selectedVital = vitalOptions.find(v => v.code === value);
+            if (selectedVital) {
+              updatedVital.name = selectedVital.name;
+              updatedVital.unit = selectedVital.unit;
+              updatedVital.value = selectedVital.inputType === 'dual' ? '/' : '';
+            }
+          }
+          return updatedVital;
         }
       }
-    }
-    setVitals(newVitals);
+      return vital;
+    }));
   };
 
   const addNewVitalField = () => {
-    setVitals([...vitals, { code: '', name: '', value: '', unit: '', effectiveDateTime: new Date() }]);
+    setVitals([...vitals, { id: Date.now().toString(), code: '', name: '', value: '', unit: '', effectiveDateTime: new Date() }]);
+  };
+
+  const removeVital = (id: string) => {
+    setVitals(prevVitals => prevVitals.filter(vital => vital.id !== id));
   };
 
   const isVitalValueNormal = (vital: Vital) => {
@@ -93,11 +102,6 @@ const AddVitalsSheet: React.FC<AddVitalsSheetProps> = ({ onAddVitals }) => {
       }
     }
     return null;
-  };
-
-  const getInsights = (vital: Vital) => {
-    const selectedVital = vitalOptions.find(v => v.code === vital.code);
-    return selectedVital?.insights || [];
   };
 
   const getNormalRangeMessage = (vital: Vital) => {
@@ -133,21 +137,32 @@ const AddVitalsSheet: React.FC<AddVitalsSheetProps> = ({ onAddVitals }) => {
       <SheetTrigger asChild>
         <Button onClick={() => setIsOpen(true)}>Add Vitals</Button>
       </SheetTrigger>
-      <SheetContent className="w-[500px] sm:w-[600px] flex flex-col">
-        <SheetHeader>
+      <SheetContent className="w-[500px] sm:w-[600px] flex flex-col p-0">
+        <SheetHeader className="px-6 py-4">
           <SheetTitle>Add New Vitals</SheetTitle>
           <SheetDescription>Enter the details for the new vital signs</SheetDescription>
         </SheetHeader>
-        <form onSubmit={handleAddVital} className="flex flex-col flex-grow">
-          <ScrollArea className="flex-grow pr-4">
-            <div className="space-y-6 pb-6">
-              {vitals.map((vital, index) => (
-                <div key={index} className="space-y-4 pb-6 border-b">
+        <form onSubmit={handleAddVital} className="flex flex-col h-full">
+          <ScrollArea className="flex-grow px-6">
+            <div className="space-y-6 pb-24">
+              {vitals.map((vital) => (
+                <div key={vital.id} className="space-y-4 pb-6 relative">
+                    <div className="flex justify-between items-center mb-2">
+                    <Label htmlFor={`vital-${vital.id}`} className="text-sm font-medium">
+                      Vital Sign
+                    </Label>
+                    <span
+                      onClick={() => removeVital(vital.id)}
+                      className="text-red-500 hover:text-red-700 cursor-pointer text-sm"
+                    >
+                      Delete
+                    </span>
+                  </div>
                   <Select
                     value={vital.code}
-                    onValueChange={(value) => handleVitalChange(index, 'code', value)}
+                    onValueChange={(value) => handleVitalChange(vital.id, 'code', value)}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select vital sign" />
                     </SelectTrigger>
                     <SelectContent>
@@ -160,46 +175,46 @@ const AddVitalsSheet: React.FC<AddVitalsSheetProps> = ({ onAddVitals }) => {
                   </Select>
                   <div className="flex space-x-4">
                     <div className="flex-grow">
-                      <Label htmlFor={`value-${index}`}>Value</Label>
+                      <Label htmlFor={`value-${vital.id}`}>Value</Label>
                       {vitalOptions.find(v => v.code === vital.code)?.inputType === 'dual' ? (
                         <div className="flex items-center space-x-2">
                           <Input
-                            id={`systolic-${index}`}
+                            id={`systolic-${vital.id}`}
                             type="number"
                             placeholder="Systolic"
                             value={vital.value.split('/')[0]}
-                            onChange={(e) => handleVitalChange(index, 'value', `${e.target.value}/${vital.value.split('/')[1]}`)}
+                            onChange={(e) => handleVitalChange(vital.id, 'value', `${e.target.value}/${vital.value.split('/')[1]}`)}
                           />
                           <span>/</span>
                           <Input
-                            id={`diastolic-${index}`}
+                            id={`diastolic-${vital.id}`}
                             type="number"
                             placeholder="Diastolic"
                             value={vital.value.split('/')[1]}
-                            onChange={(e) => handleVitalChange(index, 'value', `${vital.value.split('/')[0]}/${e.target.value}`)}
+                            onChange={(e) => handleVitalChange(vital.id, 'value', `${vital.value.split('/')[0]}/${e.target.value}`)}
                           />
                         </div>
                       ) : (
                         <Input
-                          id={`value-${index}`}
+                          id={`value-${vital.id}`}
                           type="number"
                           placeholder="Enter value"
                           value={vital.value}
-                          onChange={(e) => handleVitalChange(index, 'value', e.target.value)}
+                          onChange={(e) => handleVitalChange(vital.id, 'value', e.target.value)}
                         />
                       )}
                     </div>
                     <div className="w-1/3">
-                      <Label htmlFor={`unit-${index}`}>Unit</Label>
+                      <Label htmlFor={`unit-${vital.id}`}>Unit</Label>
                       <Input
-                        id={`unit-${index}`}
+                        id={`unit-${vital.id}`}
                         value={vital.unit}
                         readOnly
                       />
                     </div>
                   </div>
                   <div>
-                    <Label htmlFor={`effectiveDateTime-${index}`}>Date</Label>
+                    <Label htmlFor={`effectiveDateTime-${vital.id}`}>Date</Label>
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button
@@ -220,7 +235,7 @@ const AddVitalsSheet: React.FC<AddVitalsSheetProps> = ({ onAddVitals }) => {
                         <Calendar
                           mode="single"
                           selected={vital.effectiveDateTime}
-                          onSelect={(date) => date && handleVitalChange(index, 'effectiveDateTime', date)}
+                          onSelect={(date) => date && handleVitalChange(vital.id, 'effectiveDateTime', date)}
                           initialFocus
                         />
                       </PopoverContent>
@@ -233,11 +248,6 @@ const AddVitalsSheet: React.FC<AddVitalsSheetProps> = ({ onAddVitals }) => {
                           <Info className="mr-2" />
                           {getNormalRangeMessage(vital)}
                         </div>
-                        <ul className="list-disc pl-5 mt-2">
-                          {getInsights(vital).map((insight, i) => (
-                            <li key={i} className="text-sm text-gray-600">{insight}</li>
-                          ))}
-                        </ul>
                       </AlertDescription>
                     </Alert>
                   )}
@@ -245,12 +255,12 @@ const AddVitalsSheet: React.FC<AddVitalsSheetProps> = ({ onAddVitals }) => {
               ))}
             </div>
           </ScrollArea>
-          <SheetFooter className="flex flex-col gap-2 mt-4">
-            <Button type="button" onClick={addNewVitalField} className="w-full" disabled={isSubmitting}>
+          <div className="px-6 py-4 border-t bg-background sticky bottom-0 left-0 right-0">
+            <Button type="button" onClick={addNewVitalField} className="w-full mb-2" disabled={isSubmitting}>
               <PlusCircle className="mr-2" />
               Add Another Vital
             </Button>
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
+            <Button type="submit" className="w-full" disabled={isSubmitting || !canSubmit}>
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -260,10 +270,10 @@ const AddVitalsSheet: React.FC<AddVitalsSheetProps> = ({ onAddVitals }) => {
                 'Add Vitals'
               )}
             </Button>
-          </SheetFooter>
+          </div>
         </form>
         {feedback.length > 0 && (
-          <Alert className="mt-4">
+          <Alert className="m-6 mt-0">
             <AlertDescription>
               <ul className="list-disc pl-5">
                 {feedback.map((message, index) => (

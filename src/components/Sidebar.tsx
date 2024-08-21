@@ -6,7 +6,7 @@ const Sidebar = () => {
   return (
     <aside className="fixed left-0 top-0 bottom-0 w-16 bg-[#212121] flex flex-col items-center py-4 space-y-8 z-30">
           <div className="w-10 h-10 bg-[#303030] rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-xl">D</span>
+            <span className="text-white font-bold text-xl">J</span>
           </div>
           <nav className="flex flex-col items-center space-y-6">
             <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white">
