@@ -7,6 +7,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PlusCircle, Info, Loader2 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 import { vitalOptions } from './vitalOptions';
 
 interface Vital {
@@ -14,6 +18,7 @@ interface Vital {
   name: string;
   value: string;
   unit: string;
+  effectiveDateTime: Date;
 }
 
 interface AddVitalsSheetProps {
@@ -21,7 +26,7 @@ interface AddVitalsSheetProps {
 }
 
 const AddVitalsSheet: React.FC<AddVitalsSheetProps> = ({ onAddVitals }) => {
-  const [vitals, setVitals] = useState<Vital[]>([{ code: '', name: '', value: '', unit: '' }]);
+  const [vitals, setVitals] = useState<Vital[]>([{ code: '', name: '', value: '', unit: '', effectiveDateTime: new Date() }]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<string[]>([]);
   const [isOpen, setIsOpen] = useState(false);
@@ -37,7 +42,7 @@ const AddVitalsSheet: React.FC<AddVitalsSheetProps> = ({ onAddVitals }) => {
       }
       await onAddVitals(validVitals);
       setFeedback(validVitals.map(v => `Created ${v.name} vital`));
-      setVitals([{ code: '', name: '', value: '', unit: '' }]);
+      setVitals([{ code: '', name: '', value: '', unit: '', effectiveDateTime: new Date() }]);
       setIsOpen(false);
     } catch (error) {
       console.error('Error creating vitals', error);
@@ -47,9 +52,13 @@ const AddVitalsSheet: React.FC<AddVitalsSheetProps> = ({ onAddVitals }) => {
     }
   };
 
-  const handleVitalChange = (index: number, field: keyof Vital, value: string) => {
+  const handleVitalChange = (index: number, field: keyof Vital, value: string | Date) => {
     const newVitals = [...vitals];
-    newVitals[index][field] = value;
+    if (field === 'effectiveDateTime' && value instanceof Date) {
+      newVitals[index][field] = value;
+    } else if (typeof value === 'string') {
+      newVitals[index][field as keyof Omit<Vital, 'effectiveDateTime'>] = value;
+    }
     if (field === 'code') {
       const selectedVital = vitalOptions.find(v => v.code === value);
       if (selectedVital) {
@@ -66,7 +75,7 @@ const AddVitalsSheet: React.FC<AddVitalsSheetProps> = ({ onAddVitals }) => {
   };
 
   const addNewVitalField = () => {
-    setVitals([...vitals, { code: '', name: '', value: '', unit: '' }]);
+    setVitals([...vitals, { code: '', name: '', value: '', unit: '', effectiveDateTime: new Date() }]);
   };
 
   const isVitalValueNormal = (vital: Vital) => {
@@ -188,6 +197,34 @@ const AddVitalsSheet: React.FC<AddVitalsSheetProps> = ({ onAddVitals }) => {
                         readOnly
                       />
                     </div>
+                  </div>
+                  <div>
+                    <Label htmlFor={`effectiveDateTime-${index}`}>Date</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant={"outline"}
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !vital.effectiveDateTime && "text-muted-foreground"
+                          )}
+                        >
+                          {vital.effectiveDateTime ? (
+                            format(vital.effectiveDateTime, "PPP")
+                          ) : (
+                            <span>Pick a date</span>
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={vital.effectiveDateTime}
+                          onSelect={(date) => date && handleVitalChange(index, 'effectiveDateTime', date)}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
                   </div>
                   {vital.code && vital.value && (
                     <Alert>

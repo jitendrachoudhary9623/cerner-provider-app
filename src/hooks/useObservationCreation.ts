@@ -16,6 +16,7 @@ interface VitalData {
   name: string;
   value: string;
   unit: string;
+  effectiveDateTime: Date;
 }
 
 export const useObservationCreation = () => {
@@ -37,7 +38,7 @@ export const useObservationCreation = () => {
 
       const observations = newVitals.map(vital => {
         const value = parseFloat(vital.value);
-        const date = new Date();
+        const date = new Date(vital.effectiveDateTime);
 
         switch (vital.code) {
           case 'heart-rate':
