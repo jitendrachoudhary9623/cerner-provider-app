@@ -1,10 +1,19 @@
 import { useState } from 'react';
 import axios from 'axios';
 import { Observation } from 'fhir/r4';
-import { createHeartRateObservation, createBloodPressureObservation, createBodyTemperatureObservation, createRespiratoryRateObservation, createOxygenSaturationObservation, createBodyWeight, createBMI } from '@/lib/Vital.Helpers';
+import {
+  createHeartRateObservation,
+  createBloodPressureObservation,
+  createBodyTemperatureObservation,
+  createRespiratoryRateObservation,
+  createOxygenSaturationObservation,
+  createBodyWeight,
+  createBMI
+} from '@/lib/Vital.Helpers';
 
-interface ObservationValue {
+interface VitalData {
   code: string;
+  name: string;
   value: string;
   unit: string;
 }
@@ -13,7 +22,7 @@ export const useObservationCreation = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
-  const createObservation = async (value: ObservationValue): Promise<Observation> => {
+  const createObservations = async (newVitals: VitalData[]): Promise<Observation[]> => {
     setIsCreating(true);
     setError(null);
 
@@ -22,50 +31,55 @@ export const useObservationCreation = () => {
       const patientId = localStorage.getItem("patient");
       const issuer = localStorage.getItem("issuer");
 
-      let observation: Observation;
-
-      switch (value.code) {
-        case 'blood-pressure':
-          const [systolic, diastolic] = value.value.split('/').map(Number);
-          observation = createBloodPressureObservation(patientId, systolic, diastolic);
-          break;
-        case 'heart-rate':
-          observation = createHeartRateObservation(patientId, Number(value.value));
-          break;
-        case 'temperature':
-          observation = createBodyTemperatureObservation(patientId, Number(value.value));
-          break;
-        case 'respiratory-rate':
-          observation = createRespiratoryRateObservation(patientId, Number(value.value));
-          break;
-        case 'oxygen-saturation':
-          observation = createOxygenSaturationObservation(patientId, Number(value.value));
-          break;
-        case 'body-weight':
-          observation = createBodyWeight(patientId, Number(value.value));
-          break;
-        case 'bmi':
-          observation = createBMI(patientId, Number(value.value));
-          break;
-        default:
-          throw new Error(`Unsupported vital type: ${value.code}`);
+      if (!accessToken || !patientId || !issuer) {
+        throw new Error("Missing required authentication information");
       }
 
-      const response = await axios.post<Observation>(`${issuer}/Observation`, observation, {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Accept': 'application/json',
-        },
+      const observations = newVitals.map(vital => {
+        const value = parseFloat(vital.value);
+        const date = new Date();
+
+        switch (vital.code) {
+          case 'heart-rate':
+            return createHeartRateObservation(patientId, value, date);
+          case 'blood-pressure':
+            const [systolic, diastolic] = vital.value.split('/').map(Number);
+            return createBloodPressureObservation(patientId, systolic, diastolic, date);
+          case 'temperature':
+            return createBodyTemperatureObservation(patientId, value, date);
+          case 'respiratory-rate':
+            return createRespiratoryRateObservation(patientId, value, date);
+          case 'oxygen-saturation':
+            return createOxygenSaturationObservation(patientId, value, date);
+          case 'body-weight':
+            return createBodyWeight(patientId, value, date);
+          case 'bmi':
+            return createBMI(patientId, value, date);
+          default:
+            throw new Error(`Unsupported vital type: ${vital.code}`);
+        }
       });
 
-      return response.data;
+      console.log({ observations });
+
+      const responses = await Promise.all(observations.map(observation =>
+        axios.post<Observation>(`${issuer}/Observation`, observation, {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json',
+          },
+        })
+      ));
+
+      return responses.map(response => response.data);
     } catch (err) {
-      setError(err instanceof Error ? err : new Error('An unknown error occurred'));
+      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
+      setError(new Error(errorMessage));
       throw err;
     } finally {
       setIsCreating(false);
     }
   };
 
-  return { createObservation, isCreating, error };
+  return { createObservations, isCreating, error };
 };

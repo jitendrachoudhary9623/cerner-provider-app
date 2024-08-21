@@ -10,7 +10,8 @@ export const vitalOptions = [
       'Elevated levels may indicate hypertension',
       'Low levels may indicate hypotension'
     ],
-    fhirCode: '85354-9'
+    fhirCode: '85354-9',
+    inputType: 'dual'
   },
   {
     code: 'heart-rate',
@@ -23,7 +24,9 @@ export const vitalOptions = [
       'Elevated rates may suggest anxiety or cardiac issues',
       'Low rates might indicate excellent fitness or heart problems'
     ],
-    fhirCode: '8867-4'
+    fhirCode: '8867-4',
+    inputType: 'single'
+
   },
   {
     code: 'temperature',
@@ -36,7 +39,9 @@ export const vitalOptions = [
       'Fever is often defined as 38°C (100.4°F) or higher',
       'Hypothermia is typically defined as body temperature below 35°C (95°F)'
     ],
-    fhirCode: '8310-5'
+    fhirCode: '8310-5',
+    inputType: 'single'
+
   },
   {
     code: 'respiratory-rate',
@@ -49,7 +54,8 @@ export const vitalOptions = [
       'Elevated rates may suggest anxiety, fever, or respiratory distress',
       'Low rates might indicate narcotic use or neurological problems'
     ],
-    fhirCode: '9279-1'
+    fhirCode: '9279-1',
+    inputType: 'single'
   },
   {
     code: 'oxygen-saturation',
@@ -62,7 +68,8 @@ export const vitalOptions = [
       'Levels below 90% may indicate hypoxemia',
       'Consistently low levels may suggest chronic respiratory issues'
     ],
-    fhirCode: '2708-6'
+    fhirCode: '2708-6',
+    inputType: 'single'
   },
   {
     code: 'body-weight',
@@ -75,6 +82,7 @@ export const vitalOptions = [
       'Elevated levels may indicate obesity',
       'Low levels may indicate malnutrition'
     ],
+    inputType: 'single'
   },
   {
     code: 'bmi',
@@ -87,6 +95,7 @@ export const vitalOptions = [
       'Elevated levels may indicate obesity',
       'Low levels may indicate malnutrition'
     ],
-    fhirCode: '39156-5'
+    fhirCode: '39156-5',
+    inputType: 'single'
   }
 ];

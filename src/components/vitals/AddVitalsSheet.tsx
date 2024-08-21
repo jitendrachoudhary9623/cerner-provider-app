@@ -26,23 +26,22 @@ const AddVitalsSheet: React.FC<AddVitalsSheetProps> = ({ onAddVitals }) => {
   const [feedback, setFeedback] = useState<string[]>([]);
   const [isOpen, setIsOpen] = useState(false);
 
-  const handleAddVital = async (e: React.FormEvent | undefined) => {
-    if (e && e.preventDefault) {
-      e.preventDefault();
-    }
+  const handleAddVital = async (e: React.FormEvent) => {
+    e.preventDefault();
     setIsSubmitting(true);
     setFeedback([]);
     try {
       const validVitals = vitals.filter(v => v.code && v.value);
+      if (validVitals.length === 0) {
+        throw new Error('No valid vitals to add');
+      }
       await onAddVitals(validVitals);
       setFeedback(validVitals.map(v => `Created ${v.name} vital`));
       setVitals([{ code: '', name: '', value: '', unit: '' }]);
+      setIsOpen(false);
     } catch (error) {
-      console.log({
-        message: 'Error creating vitals',
-        error,
-      })
-      setFeedback(['Error creating vitals. Please try again.']);
+      console.error('Error creating vitals', error);
+      setFeedback([(error as Error).message || 'Error creating vitals. Please try again.']);
     } finally {
       setIsSubmitting(false);
     }
@@ -56,8 +55,10 @@ const AddVitalsSheet: React.FC<AddVitalsSheetProps> = ({ onAddVitals }) => {
       if (selectedVital) {
         newVitals[index].name = selectedVital.name;
         newVitals[index].unit = selectedVital.unit;
-        if (value === 'blood-pressure') {
-          newVitals[index].value = '/'; // Initialize with a slash for systolic/diastolic
+        if (selectedVital.inputType === 'dual') {
+          newVitals[index].value = '/';
+        } else {
+          newVitals[index].value = '';
         }
       }
     }
@@ -71,7 +72,7 @@ const AddVitalsSheet: React.FC<AddVitalsSheetProps> = ({ onAddVitals }) => {
   const isVitalValueNormal = (vital: Vital) => {
     const selectedVital = vitalOptions.find(v => v.code === vital.code);
     if (selectedVital && selectedVital.normalRange) {
-      if (vital.code === 'blood-pressure') {
+      if (selectedVital.inputType === 'dual') {
         const [systolic, diastolic] = vital.value.split('/').map(Number);
         return systolic >= selectedVital.normalRange.systolic.min && 
                systolic <= selectedVital.normalRange.systolic.max &&
@@ -94,7 +95,7 @@ const AddVitalsSheet: React.FC<AddVitalsSheetProps> = ({ onAddVitals }) => {
     const selectedVital = vitalOptions.find(v => v.code === vital.code);
     if (!selectedVital) return '';
 
-    if (vital.code === 'blood-pressure') {
+    if (selectedVital.inputType === 'dual') {
       const [systolic, diastolic] = vital.value.split('/').map(Number);
       const systolicRange = `${selectedVital.normalRange.systolic.min} - ${selectedVital.normalRange.systolic.max}`;
       const diastolicRange = `${selectedVital.normalRange.diastolic.min} - ${selectedVital.normalRange.diastolic.max}`;
@@ -151,7 +152,7 @@ const AddVitalsSheet: React.FC<AddVitalsSheetProps> = ({ onAddVitals }) => {
                   <div className="flex space-x-4">
                     <div className="flex-grow">
                       <Label htmlFor={`value-${index}`}>Value</Label>
-                      {vital.code === 'blood-pressure' ? (
+                      {vitalOptions.find(v => v.code === vital.code)?.inputType === 'dual' ? (
                         <div className="flex items-center space-x-2">
                           <Input
                             id={`systolic-${index}`}
@@ -173,7 +174,7 @@ const AddVitalsSheet: React.FC<AddVitalsSheetProps> = ({ onAddVitals }) => {
                         <Input
                           id={`value-${index}`}
                           type="number"
-                          placeholder="e.g., 120"
+                          placeholder="Enter value"
                           value={vital.value}
                           onChange={(e) => handleVitalChange(index, 'value', e.target.value)}
                         />

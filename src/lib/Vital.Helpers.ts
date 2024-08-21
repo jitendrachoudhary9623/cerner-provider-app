@@ -20,47 +20,47 @@ export function createHeartRateObservation(patientId: string | null, value: numb
     .build();
 }
 
-export function createBloodPressureObservation(patientId: string | null, systolic: number, diastolic: number, date: Date = new Date()): Observation {
-  return new ObservationBuilder()
-    .setStatus("final")
-    .addCategory({
-      system: "http://loinc.org",
-      code: "85354-9",
-      display: "Blood pressure panel with all children optional"
-    })
-    .setCodes([{
-      system: "http://loinc.org",
-      code: "85354-9",
-      display: "Blood pressure panel with all children optional"
-    }])
-    .setSubject(patientId)
-    .setEffectiveDateTime(date)
-    .setComponent([
-      {
-        code: {
-          coding: [{
-            system: "http://loinc.org",
-            code: "8480-6",
-            display: "Systolic blood pressure"
-          }]
-        },
-        value: systolic,
-        unit: "mm[Hg]"
-      },
-      {
-        code: {
-          coding: [{
-            system: "http://loinc.org",
-            code: "8462-4",
-            display: "Diastolic blood pressure"
-          }]
-        },
-        value: diastolic,
-        unit: "mm[Hg]"
-      }
-    ])
-    .build();
-}
+// export function createBloodPressureObservation(patientId: string | null, systolic: number, diastolic: number, date: Date = new Date()): Observation {
+//   return new ObservationBuilder()
+//     .setStatus("final")
+//     .addCategory({
+//       system: "http://loinc.org",
+//       code: "85354-9",
+//       display: "Blood pressure panel with all children optional"
+//     })
+//     .setCodes([{
+//       system: "http://loinc.org",
+//       code: "85354-9",
+//       display: "Blood pressure panel with all children optional"
+//     }])
+//     .setSubject(patientId)
+//     .setEffectiveDateTime(date)
+//     .setComponent([
+//       {
+//         code: {
+//           coding: [{
+//             system: "http://loinc.org",
+//             code: "8480-6",
+//             display: "Systolic blood pressure"
+//           }]
+//         },
+//         value: systolic,
+//         unit: "mm[Hg]"
+//       },
+//       {
+//         code: {
+//           coding: [{
+//             system: "http://loinc.org",
+//             code: "8462-4",
+//             display: "Diastolic blood pressure"
+//           }]
+//         },
+//         value: diastolic,
+//         unit: "mm[Hg]"
+//       }
+//     ])
+//     .build();
+// }
 
 export function createBodyTemperatureObservation(patientId: string | null, value: number, date: Date = new Date()): Observation {
   return new ObservationBuilder()
@@ -153,4 +153,101 @@ export function createOxygenSaturationObservation(patientId: string | null, valu
     .setValue(value, "%", "http://unitsofmeasure.org", "%")
     .setReferenceRange(90, 99, "%")
     .build();
+}
+
+export function createBloodPressureObservation(patientId: string | null, systolic: number, diastolic: number, date: Date = new Date()): Observation {
+  return new ObservationBuilder()
+    .setStatus("final")
+    .setCodes([{
+      system: "http://loinc.org",
+      code: "85354-9",
+      display: "Blood pressure panel with all children optional"
+    }], "Blood pressure systolic & diastolic")
+    .setSubject(patientId)
+    .setEffectiveDateTime(date)
+    .setComponent([
+      {
+        code: {
+          coding: [
+            {
+              system: "http://loinc.org",
+              code: "8480-6",
+              display: "Systolic blood pressure"
+            },
+            {
+              system: "http://snomed.info/sct",
+              code: "271649006",
+              display: "Systolic blood pressure"
+            }
+          ],
+
+        },
+        unitCode: "mm[Hg]",
+        value: systolic,
+        unit: "mmHg"
+      },
+      {
+        code: {
+          coding: [
+            {
+              system: "http://loinc.org",
+              code: "8462-4",
+              display: "Diastolic blood pressure"
+            }
+          ]
+        },
+        unitCode: "mm[Hg]",
+        value: diastolic,
+        unit: "mmHg"
+      }
+    ])
+    .build();
+}
+
+function getSystolicInterpretationCode(systolic: number): string {
+  if (systolic < 90) return "L";
+  if (systolic > 140) return "H";
+  return "N";
+}
+
+function getSystolicInterpretationDisplay(systolic: number): string {
+  if (systolic < 90) return "low";
+  if (systolic > 140) return "high";
+  return "normal";
+}
+
+function getSystolicInterpretationText(systolic: number): string {
+  if (systolic < 90) return "Below normal";
+  if (systolic > 140) return "Above normal";
+  return "Normal";
+}
+
+function getDiastolicInterpretationCode(diastolic: number): string {
+  if (diastolic < 60) return "L";
+  if (diastolic > 90) return "H";
+  return "N";
+}
+
+function getDiastolicInterpretationDisplay(diastolic: number): string {
+  if (diastolic < 60) return "low";
+  if (diastolic > 90) return "high";
+  return "normal";
+}
+
+function getDiastolicInterpretationText(diastolic: number): string {
+  if (diastolic < 60) return "Below normal";
+  if (diastolic > 90) return "Above normal";
+  return "Normal";
+}
+
+function getOverallInterpretationCode(systolic: number, diastolic: number): string {
+  if (systolic < 90 || diastolic < 60) return "L";
+  if (systolic > 140 || diastolic > 90) return "H";
+  return "N";
+}
+
+function getOverallInterpretationDisplay(systolic: number, diastolic: number): string {
+  if (systolic < 90 || diastolic < 60) return "low";
+  if (systolic > 140 || diastolic > 90) return "high";
+  return "normal";
 }

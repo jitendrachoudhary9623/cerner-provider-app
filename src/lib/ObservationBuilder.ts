@@ -69,14 +69,14 @@ class ObservationBuilder {
     return this;
   }
 
-  setComponent(components: Array<{ code: CodeableConcept, value: number, unit: string }>): ObservationBuilder {
+  setComponent(components: Array<{ code: CodeableConcept, value: number, unit: string, unitCode: string | null }>): ObservationBuilder {
     this.observation.component = components.map(comp => ({
       code: comp.code,
       valueQuantity: {
         value: comp.value,
         unit: comp.unit,
         system: "http://unitsofmeasure.org",
-        code: comp.unit
+        code: comp.unitCode || comp.unit
       }
     }));
     return this;

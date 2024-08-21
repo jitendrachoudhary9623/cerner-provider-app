@@ -7,12 +7,13 @@ import VitalsChart from './VitalsChart';
 import VitalsTable from './VitalsTable';
 import LoadingView from './LoadingView';
 import NoDataView from './NoDataView';
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const Vitals: React.FC = () => {
   const { vitals, loading: fetchingVitals, refetch } = usePatientVitals();
-  const { createObservation } = useObservationCreation();
+  const { createObservations, isCreating, error: creationError } = useObservationCreation();
   const [selectedVital, setSelectedVital] = useState('all');
-  const [isAddingVitals, setIsAddingVitals] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const filteredVitals = useMemo(() => {
     if (selectedVital === 'all') return vitals;
@@ -25,60 +26,13 @@ const Vitals: React.FC = () => {
   );
 
   const handleAddVital = async (newVitals) => {
-    setIsAddingVitals(true);
+    setError(null);
     try {
-      const observations = newVitals.map(vital => ({
-        code: {
-          coding: [{
-            system: "http://loinc.org",
-            code: vital.code,
-            display: vital.name
-          }],
-          text: vital.name
-        },
-        valueQuantity: {
-          value: vital.code === 'blood-pressure' ? parseFloat(vital.value.split('/')[0]) : parseFloat(vital.value),
-          unit: vital.unit
-        },
-        ...(vital.code === 'blood-pressure' && {
-          component: [
-            {
-              code: {
-                coding: [{
-                  system: "http://loinc.org",
-                  code: "8480-6",
-                  display: "Systolic Blood Pressure"
-                }]
-              },
-              valueQuantity: {
-                value: parseFloat(vital.value.split('/')[0]),
-                unit: "mmHg"
-              }
-            },
-            {
-              code: {
-                coding: [{
-                  system: "http://loinc.org",
-                  code: "8462-4",
-                  display: "Diastolic Blood Pressure"
-                }]
-              },
-              valueQuantity: {
-                value: parseFloat(vital.value.split('/')[1]),
-                unit: "mmHg"
-              }
-            }
-          ]
-        })
-      }));
-
-      await Promise.all(observations.map(createObservation));
+      await createObservations(newVitals);
       await refetch();
-    } catch (error) {
-      console.error("Error adding vital signs:", error);
-      throw error;
-    } finally {
-      setIsAddingVitals(false);
+    } catch (err) {
+      console.error("Error adding vital signs:", err);
+      setError("Failed to add vital signs. Please try again.");
     }
   };
 
@@ -102,10 +56,16 @@ const Vitals: React.FC = () => {
         <AddVitalsSheet onAddVitals={handleAddVital} />
       </div>
 
-      {isAddingVitals && (
+      {isCreating && (
         <div className="text-center py-4">
           <p className="text-lg font-semibold text-blue-600">Adding new vitals...</p>
         </div>
+      )}
+
+      {(error || creationError) && (
+        <Alert variant="destructive">
+          <AlertDescription>{error || creationError.message}</AlertDescription>
+        </Alert>
       )}
 
       <VitalsChart
