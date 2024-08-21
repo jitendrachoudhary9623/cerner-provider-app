@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { usePatientVitals } from '@/hooks/usePatientVitals';
-import { Observation } from 'fhir/r4';
+import { useObservationCreation } from '@/hooks/useObservationCreation';
 import { motion } from 'framer-motion';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, 
          ComposedChart, Legend } from 'recharts';
@@ -8,11 +8,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import AddVitalsSheet from './AddVitalsSheet';
-import axios from 'axios';
-import { createHeartRateObservation, createBloodPressureObservation, createBodyTemperatureObservation, createRespiratoryRateObservation, createOxygenSaturationObservation, createBodyWeight, createBMI } from '@/lib/Vital.Helpers';
 
 const Vitals: React.FC = () => {
   const { vitals, loading, refetch } = usePatientVitals();
+  const { createObservation, isCreating, error } = useObservationCreation();
   const [selectedVital, setSelectedVital] = useState('all');
 
   const filteredVitals = useMemo(() => {
@@ -30,56 +29,12 @@ const Vitals: React.FC = () => {
       date: new Date(vital?.effectiveDateTime).toLocaleDateString(),
       value: vital?.valueQuantity?.value,
       code: vital?.code?.text,
-      ...(vital.code?.text === 'Blood Pressure' && {
-        systolic: vital.component?.find(c => c.code.text === 'Systolic')?.valueQuantity?.value,
-        diastolic: vital.component?.find(c => c.code.text === 'Diastolic')?.valueQuantity?.value,
+      ...(vital.code?.text === 'Blood pressure' && {
+        systolic: vital.component?.find(c => c.code.coding[0].display === 'Systolic Blood Pressure')?.valueQuantity?.value,
+        diastolic: vital.component?.find(c => c.code.coding[0].display === 'Diastolic Blood Pressure')?.valueQuantity?.value,
       })
     }));
   }, [filteredVitals]);
-
-  const createObservation = async (value: { code: string, value: string, unit: string }) => {
-    const accessToken = localStorage.getItem("access_token");
-    const patientId = localStorage.getItem("patient");
-    const issuer = localStorage.getItem("issuer");
-  
-    let observation: Observation;
-  
-    switch (value.code) {
-      case 'blood-pressure':
-        const [systolic, diastolic] = value.value.split('/').map(Number);
-        observation = createBloodPressureObservation(patientId, systolic, diastolic);
-        break;
-      case 'heart-rate':
-        observation = createHeartRateObservation(patientId, Number(value.value));
-        break;
-      case 'temperature':
-        observation = createBodyTemperatureObservation(patientId, Number(value.value));
-        break;
-      case 'respiratory-rate':
-        observation = createRespiratoryRateObservation(patientId, Number(value.value));
-        break;
-      case 'oxygen-saturation':
-        observation = createOxygenSaturationObservation(patientId, Number(value.value));
-        break;
-      case 'body-weight':
-        observation = createBodyWeight(patientId, Number(value.value));
-        break;
-      case 'bmi':
-        observation = createBMI(patientId, Number(value.value));
-        break;
-      default:
-        throw new Error(`Unsupported vital type: ${value.code}`);
-    }
-  
-    const response = await axios.post<Observation>(`${issuer}/Observation`, observation, {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Accept': 'application/json',
-      },
-    });
-  
-    return response.data;
-  };
 
   const handleAddVital = async (values) => {
     try {
@@ -91,7 +46,7 @@ const Vitals: React.FC = () => {
     }
   };
 
-  if (loading) {
+  if (loading || isCreating) {
     return (
       <motion.div
         initial={{ opacity: 0 }}
@@ -105,7 +60,21 @@ const Vitals: React.FC = () => {
           </div>
         </div>
         <div className="text-2xl font-semibold text-gray-600 mt-4">
-          Loading vitals...
+          {loading ? 'Loading vitals...' : 'Adding new vitals...'}
+        </div>
+      </motion.div>
+    );
+  }
+
+  if (error) {
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="flex flex-col items-center justify-center h-64"
+      >
+        <div className="text-2xl font-semibold text-red-600 mt-4">
+          Error: {error.message}
         </div>
       </motion.div>
     );
@@ -163,7 +132,7 @@ const Vitals: React.FC = () => {
           </div>
           <div className="h-[400px]">
             <ResponsiveContainer width="100%" height="100%">
-              {selectedVital === 'Blood Pressure' ? (
+              {selectedVital === 'Blood pressure' ? (
                 <ComposedChart data={chartData}>
                   <XAxis dataKey="date" />
                   <YAxis />
@@ -198,6 +167,7 @@ const Vitals: React.FC = () => {
                 <TableHead>Vital Sign</TableHead>
                 <TableHead>Value</TableHead>
                 <TableHead>Unit</TableHead>
+                <TableHead>Performer</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -206,12 +176,19 @@ const Vitals: React.FC = () => {
                   <TableCell>{new Date(vital.effectiveDateTime).toLocaleDateString()}</TableCell>
                   <TableCell>{vital.code?.text}</TableCell>
                   <TableCell>
-                    {vital.code?.text === 'Blood Pressure'
-                      ? `${vital.component?.find(c => c.code.text === 'Systolic')?.valueQuantity?.value} / 
-                         ${vital.component?.find(c => c.code.text === 'Diastolic')?.valueQuantity?.value}`
+                    {vital.code?.text === 'Blood pressure'
+                      ? `${vital.component?.find(c => c.code.coding[0].display === 'Systolic Blood Pressure')?.valueQuantity?.value} / 
+                         ${vital.component?.find(c => c.code.coding[0].display === 'Diastolic Blood Pressure')?.valueQuantity?.value}`
                       : vital.valueQuantity?.value}
                   </TableCell>
-                  <TableCell>{vital.valueQuantity?.unit}</TableCell>
+                  <TableCell>
+                    {vital.code?.text === 'Blood pressure'
+                      ? 'mmHg'
+                      : vital.valueQuantity?.unit}
+                  </TableCell>
+                  <TableCell>
+                    {vital.performer?.[0]?.reference.split('/')[1] || 'N/A'}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

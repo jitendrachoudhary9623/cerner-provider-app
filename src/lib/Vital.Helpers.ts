@@ -81,7 +81,7 @@ export function createRespiratoryRateObservation(patientId: string | null, value
   return new ObservationBuilder()
     .setStatus("final")
     .setCodes([{
-     "system": "http://loinc.org",
+      "system": "http://loinc.org",
       "code": "9279-1",
       display: "Respiratory Rate"
     }])
@@ -96,11 +96,16 @@ export function createBodyWeight(patientId: string | null, value: number, date: 
     .setStatus("final")
     .setCodes([
       {
-        system: "http://loinc.org",
-        code: "29463-7",
-        display: "Body weight"
+        "system": "http://loinc.org",
+        "code": "29463-7",
+        "display": "Body weight"
+      },
+      {
+        "system": "http://loinc.org",
+        "code": "3141-9",
+        "display": "Body weight Measured"
       }
-    ])
+    ], "Weight Measured")
     .setSubject(patientId)
     .setEffectiveDateTime(date)
     .setValue(value, "kg", "http://unitsofmeasure.org", "kg")
