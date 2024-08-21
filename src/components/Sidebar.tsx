@@ -12,6 +12,10 @@ const Sidebar = () => {
             <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white">
               <Home className="h-6 w-6" />
             </Button>
+
+
+
+            
             <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white">
               <BarChart2 className="h-6 w-6" />
             </Button>
